@@ -14,13 +14,19 @@ class AdminStockAuditController extends ModuleAdminController
     {
         $this->bootstrap = true;
         $this->table = 'stock_audit';
-        $this->className = 'StockAuditModel';
         $this->lang = false;
         $this->allow_export = true;
         $this->deleted = false;
         $this->context = Context::getContext();
+        $this->identifier = 'id_stock_audit';
+        $this->_defaultOrderBy = 'id_stock_audit';
+        $this->_defaultOrderWay = 'DESC';
 
         parent::__construct();
+
+        // Forzar ejecución de JOINs y SELECT
+        $this->_select();
+        $this->_join();
 
         $this->bulk_actions = array(
             'delete' => array(
