@@ -54,7 +54,7 @@ class AdminStockAuditController extends ModuleAdminController
                 'title' => $this->l('Producto'),
                 'callback' => 'formatProductName'
             ),
-            'reference' => array(
+            'ref_display' => array(
                 'title' => $this->l('Referencia')
             ),
             'quantity_before' => array(
@@ -129,7 +129,7 @@ class AdminStockAuditController extends ModuleAdminController
 
         if (!$id_stock_audit) {
             $this->errors[] = $this->l('ID de auditoría inválido');
-            return;
+            return $this->context->smarty->fetch($this->template);
         }
 
         // Obtener datos completos del registro
@@ -151,7 +151,7 @@ class AdminStockAuditController extends ModuleAdminController
 
         if (!$record) {
             $this->errors[] = $this->l('Registro no encontrado');
-            return;
+            return $this->context->smarty->fetch($this->template);
         }
 
         // Obtener información de combinación si existe
@@ -173,16 +173,17 @@ class AdminStockAuditController extends ModuleAdminController
         // Determinar referencia a mostrar
         $reference = !empty($record['combination_reference']) ? $record['combination_reference'] : $record['product_reference'];
 
-        // Preparar datos para la vista
-        $this->tpl_view_vars = array(
+        // Asignar variables a Smarty
+        $this->context->smarty->assign(array(
             'record' => $record,
             'combination_name' => $combination_name,
             'reference' => $reference,
             'movement_types' => $this->getMovementTypes(),
             'back_url' => self::$currentIndex . '&token=' . $this->token
-        );
+        ));
 
-        return parent::renderView();
+        // Cargar y retornar el template
+        return $this->context->smarty->fetch(_PS_MODULE_DIR_ . 'stockaudit/views/templates/admin/view.tpl');
     }
 
     /**
@@ -198,7 +199,7 @@ class AdminStockAuditController extends ModuleAdminController
      */
     protected function _select()
     {
-        $this->_select = 'IFNULL(pa.`reference`, p.`reference`) AS `reference`,
+        $this->_select = 'IFNULL(pa.`reference`, p.`reference`) AS `ref_display`,
             IFNULL(pl.`name`, "Producto eliminado") AS `product_name`,
             CONCAT(IFNULL(e.`firstname`, ""), " ", IFNULL(e.`lastname`, "")) AS `employee_name`';
     }
@@ -451,7 +452,7 @@ class AdminStockAuditController extends ModuleAdminController
                 $row['id_stock_audit'],
                 $row['date_add'],
                 $row['product_name'],
-                !empty($row['reference']) ? $row['reference'] : '',
+                !empty($row['ref_display']) ? $row['ref_display'] : '',
                 $combination_name,
                 $row['quantity_before'],
                 $row['quantity_after'],
