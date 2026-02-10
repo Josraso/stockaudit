@@ -263,7 +263,12 @@ class AdminStockAuditController extends ModuleAdminController
      */
     protected function _select()
     {
-        $this->_select = 'IFNULL(pa.`reference`, p.`reference`) AS `ref_display`,
+        $this->_select = 'a.`quantity_before`,
+            a.`quantity_after`,
+            a.`quantity_diff`,
+            a.`id_product`,
+            a.`id_product_attribute`,
+            IFNULL(pa.`reference`, p.`reference`) AS `ref_display`,
             IFNULL(pl.`name`, "Producto eliminado") AS `product_name`,
             CONCAT(IFNULL(e.`firstname`, ""), " ", IFNULL(e.`lastname`, "")) AS `employee_name`';
     }
