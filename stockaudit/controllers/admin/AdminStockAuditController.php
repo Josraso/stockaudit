@@ -333,6 +333,14 @@ class AdminStockAuditController extends ModuleAdminController
             $order_link = '<a href="' . $this->context->link->getAdminLink('AdminOrders') . '&id_order=' . (int)$movement['id_order'] . '&vieworder" target="_blank">#' . (int)$movement['id_order'] . '</a>';
         }
 
+        // Botón ver detalle de este movimiento
+        $view_url = self::$currentIndex . '&id_stock_audit=' . (int)$movement['id_stock_audit'] . '&viewstock_audit&token=' . $this->token;
+        $view_btn = '<a href="' . $view_url . '"
+                        class="btn btn-default btn-xs"
+                        title="' . $this->l('Ver detalle completo') . '">
+                        <i class="icon-eye"></i>
+                    </a>';
+
         return '<tr class="expanded-row" style="background-color: #f9f9f9;">
                     <td style="padding-left: 30px; color: #999;">' . $date . '</td>
                     <td colspan="2" style="color: #666;"><em>' . $this->l('Movimiento anterior') . '</em></td>
@@ -346,7 +354,7 @@ class AdminStockAuditController extends ModuleAdminController
                     </td>
                     <td><span class="label label-default">' . $type . '</span></td>
                     <td class="text-center">' . $order_link . '</td>
-                    <td></td>
+                    <td class="text-center">' . $view_btn . '</td>
                 </tr>';
     }
 
@@ -570,7 +578,7 @@ class AdminStockAuditController extends ModuleAdminController
     }
 
     /**
-     * Formatear acciones (botones de expandir y ver todo)
+     * Formatear acciones (botón expandir y botón ver detalle)
      */
     public function formatActions($value, $row)
     {
@@ -578,29 +586,25 @@ class AdminStockAuditController extends ModuleAdminController
         $id_product_attribute = (int)$row['id_product_attribute'];
         $id_stock_audit = (int)$row['id_stock_audit'];
 
-        // Botón expandir/colapsar
+        // Botón expandir/colapsar movimientos previos
         $expand_btn = '<button class="btn btn-default btn-xs btn-expand-movements"
                               data-id-product="' . $id_product . '"
                               data-id-product-attribute="' . $id_product_attribute . '"
                               data-id-audit="' . $id_stock_audit . '"
-                              title="' . $this->l('Expandir movimientos') . '">
+                              title="' . $this->l('Ver movimientos anteriores') . '">
                             <i class="icon-plus"></i>
                        </button>';
 
-        // Botón ver historial completo
-        $history_url = self::$currentIndex . '&viewproduct&id_product=' . $id_product;
-        if ($id_product_attribute > 0) {
-            $history_url .= '&id_product_attribute=' . $id_product_attribute;
-        }
-        $history_url .= '&token=' . $this->token;
+        // Botón ver detalle completo de ESTE movimiento
+        $view_url = self::$currentIndex . '&id_stock_audit=' . $id_stock_audit . '&viewstock_audit&token=' . $this->token;
 
-        $history_btn = '<a href="' . $history_url . '"
-                           class="btn btn-primary btn-xs"
-                           title="' . $this->l('Ver historial completo') . '">
-                            <i class="icon-list"></i>
-                        </a>';
+        $view_btn = '<a href="' . $view_url . '"
+                        class="btn btn-default btn-xs"
+                        title="' . $this->l('Ver detalle completo') . '">
+                        <i class="icon-eye"></i>
+                    </a>';
 
-        return $expand_btn . ' ' . $history_btn;
+        return $expand_btn . ' ' . $view_btn;
     }
 
     /**
