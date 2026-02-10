@@ -50,13 +50,14 @@ class StockAudit extends Module
             && $this->registerHook('actionAdminControllerSetMedia')  // Para detectar controlador
             && $this->registerHook('actionValidateOrder')
             && $this->registerHook('actionOrderStatusPostUpdate')
-            && $this->installTab();
+            && $this->installTab()
+            && $this->installOverride();  // Instalar override
 
         // Registrar stock inicial de todos los productos
         if ($install) {
             $this->registerInitialStock();
         }
-        
+
         return $install;
     }
 
@@ -67,7 +68,8 @@ class StockAudit extends Module
     {
         return parent::uninstall()
             && $this->uninstallDB()
-            && $this->uninstallTab();
+            && $this->uninstallTab()
+            && $this->uninstallOverride();  // Desinstalar override
     }
 
     /**
@@ -142,13 +144,78 @@ class StockAudit extends Module
     private function uninstallTab()
     {
         $id_tab = (int)Tab::getIdFromClassName('AdminStockAudit');
-        
+
         if ($id_tab) {
             $tab = new Tab($id_tab);
             return $tab->delete();
         }
-        
+
         return true;
+    }
+
+    /**
+     * Instalar override de StockAvailable
+     */
+    private function installOverride()
+    {
+        // PrestaShop maneja los overrides automáticamente desde la carpeta override/
+        // Solo necesitamos asegurarnos de que el archivo existe
+        $override_file = dirname(__FILE__) . '/override/classes/StockAvailable.php';
+
+        if (!file_exists($override_file)) {
+            return false;
+        }
+
+        // Regenerar el class_index.php para que PrestaShop reconozca el override
+        try {
+            if (method_exists('Tools', 'generateIndex')) {
+                Tools::generateIndex();
+            }
+        } catch (Exception $e) {
+            // Si falla, intentar manualmente
+            $this->clearCache();
+        }
+
+        return true;
+    }
+
+    /**
+     * Desinstalar override de StockAvailable
+     */
+    private function uninstallOverride()
+    {
+        // Eliminar el override del directorio de PrestaShop
+        $ps_override_file = _PS_OVERRIDE_DIR_ . 'classes/StockAvailable.php';
+
+        if (file_exists($ps_override_file)) {
+            // Verificar que es nuestro override antes de eliminarlo
+            $content = file_get_contents($ps_override_file);
+            if (strpos($content, 'stockaudit') !== false) {
+                @unlink($ps_override_file);
+            }
+        }
+
+        // Regenerar el class_index.php
+        try {
+            if (method_exists('Tools', 'generateIndex')) {
+                Tools::generateIndex();
+            }
+        } catch (Exception $e) {
+            $this->clearCache();
+        }
+
+        return true;
+    }
+
+    /**
+     * Limpiar caché
+     */
+    private function clearCache()
+    {
+        Tools::clearCache();
+        if (file_exists(_PS_CLASS_INDEX_FILE_)) {
+            @unlink(_PS_CLASS_INDEX_FILE_);
+        }
     }
 
     /**
