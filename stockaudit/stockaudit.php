@@ -44,10 +44,11 @@ class StockAudit extends Module
         $install = parent::install()
             && $this->installDB()
             && $this->registerHook('actionUpdateQuantity')
+            && $this->registerHook('actionObjectStockAvailableUpdateAfter')
             && $this->registerHook('actionValidateOrder')
             && $this->registerHook('actionOrderStatusPostUpdate')
             && $this->installTab();
-        
+
         // Registrar stock inicial de todos los productos
         if ($install) {
             $this->registerInitialStock();
@@ -148,7 +149,68 @@ class StockAudit extends Module
     }
 
     /**
-     * Hook: Actualización de cantidad (principal)
+     * Hook: PRINCIPAL - Actualización de stock_available (SE DISPARA SIEMPRE)
+     * Este es el más importante - captura TODOS los cambios de stock
+     */
+    public function hookActionObjectStockAvailableUpdateAfter($params)
+    {
+        if (!isset($params['object']) || !($params['object'] instanceof StockAvailable)) {
+            return;
+        }
+
+        $stock_available = $params['object'];
+        $id_product = (int)$stock_available->id_product;
+        $id_product_attribute = (int)$stock_available->id_product_attribute;
+
+        // Obtener stock ANTES desde el último registro
+        $quantity_before = $this->getLastRecordedStock($id_product, $id_product_attribute);
+
+        // Si no hay registro previo, obtener de BD
+        if ($quantity_before === null) {
+            // Intentar obtener el valor anterior del objeto
+            $quantity_before = isset($stock_available->oldvalues['quantity']) ? (int)$stock_available->oldvalues['quantity'] : (int)$stock_available->quantity;
+        }
+
+        // Stock DESPUÉS es el nuevo valor
+        $quantity_after = (int)$stock_available->quantity;
+
+        // NO registrar si no hay cambio
+        if ($quantity_before == $quantity_after) {
+            return;
+        }
+
+        // Determinar tipo de movimiento según el contexto
+        $context = Context::getContext();
+        $movement_type = 'update';
+        $reason = 'Actualización de stock';
+        $id_order = null;
+
+        // Detectar si es desde el backoffice
+        if (isset($context->controller) && $context->controller instanceof AdminController) {
+            $controller_name = get_class($context->controller);
+
+            if (strpos($controller_name, 'AdminProducts') !== false) {
+                $movement_type = 'manual_update';
+                $reason = 'Edición manual desde ficha de producto';
+            } elseif (strpos($controller_name, 'AdminStock') !== false) {
+                $movement_type = 'manual_update';
+                $reason = 'Actualización desde control de stocks';
+            }
+        }
+
+        $this->logStockMovement(
+            $id_product,
+            $id_product_attribute,
+            $quantity_before,
+            $quantity_after,
+            $movement_type,
+            $reason,
+            $id_order
+        );
+    }
+
+    /**
+     * Hook: Actualización de cantidad (complementario para pedidos)
      */
     public function hookActionUpdateQuantity($params)
     {
