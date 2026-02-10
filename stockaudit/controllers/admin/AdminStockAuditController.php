@@ -40,38 +40,25 @@ class AdminStockAuditController extends ModuleAdminController
         );
 
         $this->fields_list = array(
-            'id_stock_audit' => array(
-                'title' => $this->l('ID'),
-                'align' => 'center',
-                'class' => 'fixed-width-xs'
-            ),
             'date_add' => array(
-                'title' => $this->l('Fecha'),
+                'title' => $this->l('Fecha y Hora'),
                 'type' => 'datetime',
-                'filter_key' => 'a!date_add'
+                'filter_key' => 'a!date_add',
+                'callback' => 'formatDateSpanish'
             ),
             'product_name' => array(
                 'title' => $this->l('Producto'),
-                'callback' => 'formatProductName'
+                'callback' => 'formatProductNameWithHistory'
             ),
             'ref_display' => array(
-                'title' => $this->l('Referencia')
+                'title' => $this->l('Ref.')
             ),
-            'quantity_before' => array(
-                'title' => $this->l('Stock Anterior'),
+            'stock_change' => array(
+                'title' => $this->l('Cambio de Stock'),
                 'align' => 'center',
-                'class' => 'fixed-width-sm'
-            ),
-            'quantity_after' => array(
-                'title' => $this->l('Stock Nuevo'),
-                'align' => 'center',
-                'class' => 'fixed-width-sm'
-            ),
-            'quantity_diff' => array(
-                'title' => $this->l('Diferencia'),
-                'align' => 'center',
-                'class' => 'fixed-width-sm',
-                'callback' => 'formatDifference'
+                'callback' => 'formatStockChange',
+                'search' => false,
+                'orderby' => false
             ),
             'movement_type' => array(
                 'title' => $this->l('Tipo'),
@@ -80,16 +67,8 @@ class AdminStockAuditController extends ModuleAdminController
                 'filter_key' => 'a!movement_type',
                 'callback' => 'formatMovementType'
             ),
-            'employee_name' => array(
-                'title' => $this->l('Usuario'),
-                'callback' => 'formatEmployee'
-            ),
-            'movement_source' => array(
-                'title' => $this->l('Origen'),
-                'filter_key' => 'a!movement_source'
-            ),
             'id_order' => array(
-                'title' => $this->l('ID Pedido'),
+                'title' => $this->l('Pedido'),
                 'align' => 'center',
                 'class' => 'fixed-width-sm',
                 'callback' => 'formatOrderLink'
@@ -187,6 +166,91 @@ class AdminStockAuditController extends ModuleAdminController
     }
 
     /**
+     * Renderizar historial completo del producto
+     */
+    public function initContent()
+    {
+        if (Tools::getValue('viewproduct')) {
+            $this->display = 'viewproduct';
+            $this->content = $this->renderProductHistory();
+            return;
+        }
+
+        parent::initContent();
+    }
+
+    /**
+     * Mostrar historial completo de un producto
+     */
+    public function renderProductHistory()
+    {
+        $id_product = (int)Tools::getValue('id_product');
+        $id_product_attribute = (int)Tools::getValue('id_product_attribute');
+
+        if (!$id_product) {
+            $this->errors[] = $this->l('ID de producto inválido');
+            return $this->context->smarty->fetch($this->template);
+        }
+
+        // Obtener información del producto
+        $product = new Product($id_product, false, $this->context->language->id);
+        if (!Validate::isLoadedObject($product)) {
+            $this->errors[] = $this->l('Producto no encontrado');
+            return $this->context->smarty->fetch($this->template);
+        }
+
+        // Obtener combinación si existe
+        $combination_name = '';
+        if ($id_product_attribute > 0) {
+            $combination = new Combination($id_product_attribute);
+            if (Validate::isLoadedObject($combination)) {
+                $attributes = $combination->getAttributesName($this->context->language->id);
+                if (is_array($attributes) && count($attributes) > 0) {
+                    $attr_names = array();
+                    foreach ($attributes as $attr) {
+                        $attr_names[] = $attr['name'];
+                    }
+                    $combination_name = implode(', ', $attr_names);
+                }
+            }
+        }
+
+        // Obtener TODOS los movimientos del producto
+        $sql = 'SELECT a.*,
+                IFNULL(pa.`reference`, p.`reference`) AS `reference`,
+                pl.`name` AS `product_name`,
+                CONCAT(IFNULL(e.`firstname`, ""), " ", IFNULL(e.`lastname`, "")) AS `employee_name`,
+                o.`reference` AS `order_reference`
+            FROM `' . _DB_PREFIX_ . 'stock_audit` a
+            LEFT JOIN `' . _DB_PREFIX_ . 'product` p ON (p.`id_product` = a.`id_product`)
+            LEFT JOIN `' . _DB_PREFIX_ . 'product_attribute` pa ON (pa.`id_product_attribute` = a.`id_product_attribute` AND a.`id_product_attribute` != 0)
+            LEFT JOIN `' . _DB_PREFIX_ . 'product_lang` pl ON (pl.`id_product` = a.`id_product` AND pl.`id_lang` = ' . (int)$this->context->language->id . ')
+            LEFT JOIN `' . _DB_PREFIX_ . 'employee` e ON (e.`id_employee` = a.`id_employee`)
+            LEFT JOIN `' . _DB_PREFIX_ . 'orders` o ON (o.`id_order` = a.`id_order`)
+            WHERE a.`id_product` = ' . $id_product;
+
+        if ($id_product_attribute > 0) {
+            $sql .= ' AND a.`id_product_attribute` = ' . $id_product_attribute;
+        }
+
+        $sql .= ' ORDER BY a.`date_add` DESC';
+
+        $movements = Db::getInstance()->executeS($sql);
+
+        // Asignar variables a Smarty
+        $this->context->smarty->assign(array(
+            'product' => $product,
+            'combination_name' => $combination_name,
+            'movements' => $movements,
+            'movement_types' => $this->getMovementTypes(),
+            'back_url' => self::$currentIndex . '&token=' . $this->token
+        ));
+
+        // Cargar y retornar el template
+        return $this->context->smarty->fetch(_PS_MODULE_DIR_ . 'stockaudit/views/templates/admin/product_history.tpl');
+    }
+
+    /**
      * Consulta SQL personalizada
      */
     public function getList($id_lang, $order_by = null, $order_way = null, $start = 0, $limit = null, $id_lang_shop = false)
@@ -246,12 +310,60 @@ class AdminStockAuditController extends ModuleAdminController
     }
 
     /**
-     * Formatear nombre del producto
+     * Formatear fecha en español
      */
-    public function formatProductName($value, $row)
+    public function formatDateSpanish($value, $row)
     {
-        $name = $value;
-        
+        if (empty($value)) {
+            return '-';
+        }
+
+        // Convertir a timestamp
+        $timestamp = strtotime($value);
+
+        // Formato: dd/mm/yyyy HH:mm:ss
+        return date('d/m/Y H:i:s', $timestamp);
+    }
+
+    /**
+     * Formatear cambio de stock visual
+     */
+    public function formatStockChange($value, $row)
+    {
+        $before = (int)$row['quantity_before'];
+        $after = (int)$row['quantity_after'];
+        $diff = (int)$row['quantity_diff'];
+
+        $color_class = 'info';
+        $icon = 'arrows-h';
+        $sign = '';
+
+        if ($diff > 0) {
+            $color_class = 'success';
+            $icon = 'arrow-up';
+            $sign = '+';
+        } elseif ($diff < 0) {
+            $color_class = 'danger';
+            $icon = 'arrow-down';
+        }
+
+        return '<span style="white-space: nowrap;">
+                    <strong>' . $before . '</strong>
+                    <i class="icon-arrow-right text-muted"></i>
+                    <strong>' . $after . '</strong>
+                    <span class="badge badge-' . $color_class . '" style="margin-left: 5px;">
+                        <i class="icon-' . $icon . '"></i> ' . $sign . $diff . '
+                    </span>
+                </span>';
+    }
+
+    /**
+     * Formatear nombre del producto con botón de historial
+     */
+    public function formatProductNameWithHistory($value, $row)
+    {
+        $name = '<strong>' . $value . '</strong>';
+
         // Si tiene combinación, añadirla
         if (!empty($row['id_product_attribute']) && $row['id_product_attribute'] > 0) {
             $combination = new Combination($row['id_product_attribute']);
@@ -262,11 +374,22 @@ class AdminStockAuditController extends ModuleAdminController
                     foreach ($attributes as $attr) {
                         $attr_names[] = $attr['name'];
                     }
-                    $name .= '<br><small class="text-muted">' . implode(', ', $attr_names) . '</small>';
+                    $name .= '<br><small class="text-muted"><i class="icon-sitemap"></i> ' . implode(', ', $attr_names) . '</small>';
                 }
             }
         }
-        
+
+        // Añadir botón para ver historial completo del producto
+        $history_url = self::$currentIndex . '&viewproduct&id_product=' . (int)$row['id_product'];
+        if (!empty($row['id_product_attribute']) && $row['id_product_attribute'] > 0) {
+            $history_url .= '&id_product_attribute=' . (int)$row['id_product_attribute'];
+        }
+        $history_url .= '&token=' . $this->token;
+
+        $name .= '<br><a href="' . $history_url . '" class="btn btn-default btn-xs" style="margin-top: 3px;">
+                    <i class="icon-history"></i> ' . $this->l('Ver historial completo') . '
+                  </a>';
+
         return $name;
     }
 

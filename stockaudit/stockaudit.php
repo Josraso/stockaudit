@@ -44,8 +44,6 @@ class StockAudit extends Module
         $install = parent::install()
             && $this->installDB()
             && $this->registerHook('actionUpdateQuantity')
-            && $this->registerHook('actionProductUpdate')
-            && $this->registerHook('actionObjectProductUpdateAfter')
             && $this->registerHook('actionValidateOrder')
             && $this->registerHook('actionOrderStatusPostUpdate')
             && $this->installTab();
@@ -168,6 +166,11 @@ class StockAudit extends Module
         // El stock DESPUÉS del cambio siempre viene de la BD (ya está actualizado)
         $quantity_after = $this->getProductStock($id_product, $id_product_attribute);
 
+        // NO registrar si no hay cambio en el stock
+        if ($quantity_before == $quantity_after) {
+            return;
+        }
+
         // Determinar el tipo de movimiento
         $movement_type = 'update';
         $reason = 'Actualización de cantidad';
@@ -211,48 +214,6 @@ class StockAudit extends Module
         $quantity = Db::getInstance()->getValue($sql);
         
         return $quantity !== false ? (int)$quantity : 0;
-    }
-
-    /**
-     * Hook: Actualización de producto (después)
-     */
-    public function hookActionObjectProductUpdateAfter($params)
-    {
-        if (isset($params['object']) && $params['object'] instanceof Product) {
-            $product = $params['object'];
-            $id_product = (int)$product->id;
-
-            // Solo para productos sin combinaciones
-            if (!$product->hasCombinations()) {
-                // Stock ANTES = último registrado en auditoría
-                $quantity_before = $this->getLastRecordedStock($id_product, 0);
-
-                // Stock DESPUÉS = actual en la BD
-                $quantity_after = $this->getProductStock($id_product, 0);
-
-                // Si hay registro previo y el stock cambió, registrar
-                if ($quantity_before !== null && $quantity_after != $quantity_before) {
-                    $this->logStockMovement(
-                        $id_product,
-                        0,
-                        $quantity_before,
-                        $quantity_after,
-                        'manual_update',
-                        'Actualización manual desde backoffice'
-                    );
-                } elseif ($quantity_before === null) {
-                    // Si no hay registro previo, es la primera vez que se registra
-                    $this->logStockMovement(
-                        $id_product,
-                        0,
-                        0,
-                        $quantity_after,
-                        'initial_stock',
-                        'Stock inicial del producto'
-                    );
-                }
-            }
-        }
     }
 
     /**
