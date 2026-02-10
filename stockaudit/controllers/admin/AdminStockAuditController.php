@@ -41,17 +41,18 @@ class AdminStockAuditController extends ModuleAdminController
 
         $this->fields_list = array(
             'date_add' => array(
-                'title' => $this->l('Fecha y Hora'),
+                'title' => $this->l('Fecha'),
                 'type' => 'datetime',
                 'filter_key' => 'a!date_add',
-                'callback' => 'formatDateSpanish'
+                'callback' => 'formatDateCompact'
             ),
             'product_name' => array(
                 'title' => $this->l('Producto'),
-                'callback' => 'formatProductNameWithHistory'
+                'callback' => 'formatProductNameCompact'
             ),
             'ref_display' => array(
-                'title' => $this->l('Ref.')
+                'title' => $this->l('Ref.'),
+                'align' => 'center'
             ),
             'stock_change' => array(
                 'title' => $this->l('Cambio de Stock'),
@@ -65,13 +66,20 @@ class AdminStockAuditController extends ModuleAdminController
                 'type' => 'select',
                 'list' => $this->getMovementTypes(),
                 'filter_key' => 'a!movement_type',
-                'callback' => 'formatMovementType'
+                'callback' => 'formatMovementTypeCompact'
             ),
             'id_order' => array(
                 'title' => $this->l('Pedido'),
                 'align' => 'center',
                 'class' => 'fixed-width-sm',
-                'callback' => 'formatOrderLink'
+                'callback' => 'formatOrderLinkCompact'
+            ),
+            'actions' => array(
+                'title' => $this->l('Acciones'),
+                'align' => 'center',
+                'callback' => 'formatActions',
+                'search' => false,
+                'orderby' => false
             )
         );
     }
@@ -95,8 +103,75 @@ class AdminStockAuditController extends ModuleAdminController
             'stats' => $this->getStatistics()
         ));
 
+        $ajax_url = self::$currentIndex . '&ajax=1&action=getProductMovements&token=' . $this->token;
+
+        $javascript = '
+        <script type="text/javascript">
+        $(document).ready(function() {
+            // Handler para el botón de expandir/colapsar
+            $(document).on("click", ".btn-expand-movements", function(e) {
+                e.preventDefault();
+                var btn = $(this);
+                var icon = btn.find("i");
+                var idProduct = btn.data("id-product");
+                var idProductAttribute = btn.data("id-product-attribute");
+                var idAudit = btn.data("id-audit");
+                var row = btn.closest("tr");
+                var nextRows = row.nextUntil("tr:not(.expanded-row)");
+
+                // Si ya está expandido, colapsar
+                if (icon.hasClass("icon-minus")) {
+                    nextRows.remove();
+                    icon.removeClass("icon-minus").addClass("icon-plus");
+                    btn.attr("title", "' . $this->l('Expandir movimientos') . '");
+                    return;
+                }
+
+                // Mostrar loading
+                icon.removeClass("icon-plus").addClass("icon-spinner icon-spin");
+
+                // Hacer petición AJAX
+                $.ajax({
+                    url: "' . $ajax_url . '",
+                    type: "GET",
+                    data: {
+                        id_product: idProduct,
+                        id_product_attribute: idProductAttribute,
+                        id_audit: idAudit
+                    },
+                    dataType: "json",
+                    success: function(response) {
+                        icon.removeClass("icon-spinner icon-spin");
+                        if (response.success && response.html) {
+                            // Insertar filas expandidas después de la fila actual
+                            row.after(response.html);
+                            icon.removeClass("icon-plus").addClass("icon-minus");
+                            btn.attr("title", "' . $this->l('Colapsar movimientos') . '");
+                        } else {
+                            icon.addClass("icon-plus");
+                            alert("' . $this->l('No hay movimientos anteriores') . '");
+                        }
+                    },
+                    error: function() {
+                        icon.removeClass("icon-spinner icon-spin").addClass("icon-plus");
+                        alert("' . $this->l('Error al cargar movimientos') . '");
+                    }
+                });
+            });
+        });
+        </script>
+        <style>
+        .expanded-row {
+            background-color: #f9f9f9 !important;
+        }
+        .btn-expand-movements {
+            margin-right: 5px;
+        }
+        </style>';
+
         return $this->context->smarty->fetch(_PS_MODULE_DIR_ . 'stockaudit/views/templates/admin/stats.tpl')
-            . parent::renderList();
+            . parent::renderList()
+            . $javascript;
     }
 
     /**
@@ -170,6 +245,12 @@ class AdminStockAuditController extends ModuleAdminController
      */
     public function initContent()
     {
+        // AJAX: Obtener movimientos de un producto
+        if (Tools::getValue('ajax') && Tools::getValue('action') == 'getProductMovements') {
+            $this->ajaxGetProductMovements();
+            return;
+        }
+
         if (Tools::getValue('viewproduct')) {
             $this->display = 'viewproduct';
             $this->content = $this->renderProductHistory();
@@ -177,6 +258,96 @@ class AdminStockAuditController extends ModuleAdminController
         }
 
         parent::initContent();
+    }
+
+    /**
+     * AJAX: Obtener todos los movimientos de un producto
+     */
+    protected function ajaxGetProductMovements()
+    {
+        $id_product = (int)Tools::getValue('id_product');
+        $id_product_attribute = (int)Tools::getValue('id_product_attribute');
+        $id_current_audit = (int)Tools::getValue('id_audit');
+
+        if (!$id_product) {
+            die(json_encode(array('success' => false, 'error' => 'Invalid product ID')));
+        }
+
+        // Obtener TODOS los movimientos EXCEPTO el actual (que ya se muestra)
+        $sql = 'SELECT a.*,
+                IFNULL(pa.`reference`, p.`reference`) AS `ref_display`,
+                pl.`name` AS `product_name`,
+                CONCAT(IFNULL(e.`firstname`, ""), " ", IFNULL(e.`lastname`, "")) AS `employee_name`,
+                o.`reference` AS `order_reference`
+            FROM `' . _DB_PREFIX_ . 'stock_audit` a
+            LEFT JOIN `' . _DB_PREFIX_ . 'product` p ON (p.`id_product` = a.`id_product`)
+            LEFT JOIN `' . _DB_PREFIX_ . 'product_attribute` pa ON (pa.`id_product_attribute` = a.`id_product_attribute` AND a.`id_product_attribute` != 0)
+            LEFT JOIN `' . _DB_PREFIX_ . 'product_lang` pl ON (pl.`id_product` = a.`id_product` AND pl.`id_lang` = ' . (int)$this->context->language->id . ')
+            LEFT JOIN `' . _DB_PREFIX_ . 'employee` e ON (e.`id_employee` = a.`id_employee`)
+            LEFT JOIN `' . _DB_PREFIX_ . 'orders` o ON (o.`id_order` = a.`id_order`)
+            WHERE a.`id_product` = ' . $id_product . '
+            AND a.`id_product_attribute` = ' . $id_product_attribute . '
+            AND a.`id_stock_audit` != ' . $id_current_audit . '
+            ORDER BY a.`date_add` DESC';
+
+        $movements = Db::getInstance()->executeS($sql);
+
+        if (!$movements) {
+            die(json_encode(array('success' => true, 'movements' => array())));
+        }
+
+        // Formatear los movimientos para HTML
+        $html_rows = array();
+        foreach ($movements as $movement) {
+            $html_rows[] = $this->renderMovementRow($movement);
+        }
+
+        die(json_encode(array('success' => true, 'html' => implode('', $html_rows))));
+    }
+
+    /**
+     * Renderizar una fila de movimiento para AJAX
+     */
+    protected function renderMovementRow($movement)
+    {
+        $date = date('d/m H:i', strtotime($movement['date_add']));
+
+        $before = (int)$movement['quantity_before'];
+        $after = (int)$movement['quantity_after'];
+        $diff = (int)$movement['quantity_diff'];
+
+        $color_class = 'info';
+        $sign = '';
+        if ($diff > 0) {
+            $color_class = 'success';
+            $sign = '+';
+        } elseif ($diff < 0) {
+            $color_class = 'danger';
+        }
+
+        $types = $this->getMovementTypes();
+        $type = isset($types[$movement['movement_type']]) ? $types[$movement['movement_type']] : $movement['movement_type'];
+
+        $order_link = '-';
+        if (!empty($movement['id_order']) && $movement['id_order'] > 0) {
+            $order_link = '<a href="' . $this->context->link->getAdminLink('AdminOrders') . '&id_order=' . (int)$movement['id_order'] . '&vieworder" target="_blank">#' . (int)$movement['id_order'] . '</a>';
+        }
+
+        return '<tr class="expanded-row" style="background-color: #f9f9f9;">
+                    <td style="padding-left: 30px; color: #999;">' . $date . '</td>
+                    <td colspan="2" style="color: #666;"><em>' . $this->l('Movimiento anterior') . '</em></td>
+                    <td class="text-center">
+                        <strong>' . $before . '</strong>
+                        <i class="icon-arrow-right text-muted"></i>
+                        <strong>' . $after . '</strong>
+                        <span class="badge badge-' . $color_class . '" style="margin-left: 5px;">
+                            ' . $sign . $diff . '
+                        </span>
+                    </td>
+                    <td><span class="label label-default">' . $type . '</span></td>
+                    <td class="text-center">' . $order_link . '</td>
+                    <td></td>
+                </tr>';
     }
 
     /**
@@ -251,10 +422,17 @@ class AdminStockAuditController extends ModuleAdminController
     }
 
     /**
-     * Consulta SQL personalizada
+     * Consulta SQL personalizada - Solo mostrar último movimiento de cada producto
      */
     public function getList($id_lang, $order_by = null, $order_way = null, $start = 0, $limit = null, $id_lang_shop = false)
     {
+        // Modificar WHERE para mostrar solo el último movimiento de cada producto
+        $this->_where .= ' AND a.`id_stock_audit` IN (
+            SELECT MAX(sa.`id_stock_audit`)
+            FROM `' . _DB_PREFIX_ . 'stock_audit` sa
+            GROUP BY sa.`id_product`, sa.`id_product_attribute`
+        )';
+
         parent::getList($id_lang, $order_by, $order_way, $start, $limit, $id_lang_shop);
     }
 
@@ -315,19 +493,114 @@ class AdminStockAuditController extends ModuleAdminController
     }
 
     /**
-     * Formatear fecha en español
+     * Formatear fecha en español compacta
      */
-    public function formatDateSpanish($value, $row)
+    public function formatDateCompact($value, $row)
     {
         if (empty($value)) {
             return '-';
         }
 
-        // Convertir a timestamp
+        // Formato compacto: dd/mm HH:mm
         $timestamp = strtotime($value);
+        return date('d/m H:i', $timestamp);
+    }
 
-        // Formato: dd/mm/yyyy HH:mm:ss
-        return date('d/m/Y H:i:s', $timestamp);
+    /**
+     * Formatear nombre del producto compacto (sin botones)
+     */
+    public function formatProductNameCompact($value, $row)
+    {
+        $name = '<strong>' . $value . '</strong>';
+
+        // Si tiene combinación, añadirla en la misma línea
+        if (!empty($row['id_product_attribute']) && $row['id_product_attribute'] > 0) {
+            $combination = new Combination($row['id_product_attribute']);
+            if (Validate::isLoadedObject($combination)) {
+                $attributes = $combination->getAttributesName($this->context->language->id);
+                if (is_array($attributes) && count($attributes) > 0) {
+                    $attr_names = array();
+                    foreach ($attributes as $attr) {
+                        $attr_names[] = $attr['name'];
+                    }
+                    $name .= ' <small class="text-muted">(' . implode(', ', $attr_names) . ')</small>';
+                }
+            }
+        }
+
+        return $name;
+    }
+
+    /**
+     * Formatear tipo de movimiento compacto
+     */
+    public function formatMovementTypeCompact($value, $row)
+    {
+        $types = $this->getMovementTypes();
+        $type = isset($types[$value]) ? $types[$value] : $value;
+
+        $colors = array(
+            'initial_stock' => 'primary',
+            'order' => 'danger',
+            'order_validation' => 'danger',
+            'manual_update' => 'warning',
+            'update' => 'info',
+            'stock_movement' => 'info',
+            'import' => 'success',
+            'return' => 'success',
+            'correction' => 'warning',
+            'unknown' => 'default'
+        );
+
+        $color = isset($colors[$value]) ? $colors[$value] : 'default';
+
+        return '<span class="label label-' . $color . '">' . $type . '</span>';
+    }
+
+    /**
+     * Formatear link de pedido compacto
+     */
+    public function formatOrderLinkCompact($value, $row)
+    {
+        if (empty($value) || $value == 0) {
+            return '-';
+        }
+
+        return '<a href="' . $this->context->link->getAdminLink('AdminOrders') . '&id_order=' . (int)$value . '&vieworder" target="_blank">#' . (int)$value . '</a>';
+    }
+
+    /**
+     * Formatear acciones (botones de expandir y ver todo)
+     */
+    public function formatActions($value, $row)
+    {
+        $id_product = (int)$row['id_product'];
+        $id_product_attribute = (int)$row['id_product_attribute'];
+        $id_stock_audit = (int)$row['id_stock_audit'];
+
+        // Botón expandir/colapsar
+        $expand_btn = '<button class="btn btn-default btn-xs btn-expand-movements"
+                              data-id-product="' . $id_product . '"
+                              data-id-product-attribute="' . $id_product_attribute . '"
+                              data-id-audit="' . $id_stock_audit . '"
+                              title="' . $this->l('Expandir movimientos') . '">
+                            <i class="icon-plus"></i>
+                       </button>';
+
+        // Botón ver historial completo
+        $history_url = self::$currentIndex . '&viewproduct&id_product=' . $id_product;
+        if ($id_product_attribute > 0) {
+            $history_url .= '&id_product_attribute=' . $id_product_attribute;
+        }
+        $history_url .= '&token=' . $this->token;
+
+        $history_btn = '<a href="' . $history_url . '"
+                           class="btn btn-primary btn-xs"
+                           title="' . $this->l('Ver historial completo') . '">
+                            <i class="icon-list"></i>
+                        </a>';
+
+        return $expand_btn . ' ' . $history_btn;
     }
 
     /**
