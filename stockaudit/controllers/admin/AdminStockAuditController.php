@@ -126,25 +126,34 @@ class AdminStockAuditController extends ModuleAdminController
     /**
      * Query SELECT personalizada
      */
-    public function _select()
+    protected function _select()
     {
-        $this->_select = '
-            p.`reference` AS `reference`,
-            pl.`name` AS `product_name`,
-            CONCAT(e.`firstname`, " ", e.`lastname`) AS `employee_name`,
-            a.`movement_source` AS `movement_source`,
-            a.`id_order` AS `id_order`';
+        $this->_select = 'a.`id_product`,
+            a.`id_product_attribute`,
+            a.`id_order`,
+            a.`id_employee`,
+            a.`quantity_before`,
+            a.`quantity_after`,
+            a.`quantity_diff`,
+            a.`movement_type`,
+            a.`movement_source`,
+            a.`reason`,
+            a.`date_add`,
+            a.`user_agent`,
+            a.`ip_address`,
+            p.`reference`,
+            IFNULL(pl.`name`, "Producto eliminado") AS `product_name`,
+            CONCAT(IFNULL(e.`firstname`, ""), " ", IFNULL(e.`lastname`, "")) AS `employee_name`';
     }
 
     /**
      * Query JOIN personalizada
      */
-    public function _join()
+    protected function _join()
     {
         $id_lang = (int)$this->context->language->id;
-        
-        $this->_join = '
-            LEFT JOIN `' . _DB_PREFIX_ . 'product` p ON (p.`id_product` = a.`id_product`)
+
+        $this->_join = 'LEFT JOIN `' . _DB_PREFIX_ . 'product` p ON (p.`id_product` = a.`id_product`)
             LEFT JOIN `' . _DB_PREFIX_ . 'product_lang` pl ON (pl.`id_product` = a.`id_product` AND pl.`id_lang` = ' . $id_lang . ')
             LEFT JOIN `' . _DB_PREFIX_ . 'employee` e ON (e.`id_employee` = a.`id_employee`)';
     }
@@ -152,9 +161,9 @@ class AdminStockAuditController extends ModuleAdminController
     /**
      * Query GROUP BY personalizada
      */
-    public function _group()
+    protected function _group()
     {
-        // No necesitamos GROUP BY ya que simplificamos la consulta
+        // No necesitamos GROUP BY ya que cada registro es único
         $this->_group = '';
     }
 
@@ -364,12 +373,28 @@ class AdminStockAuditController extends ModuleAdminController
 
         // Datos
         foreach ($this->_list as $row) {
+            // Obtener nombre de combinación si existe
+            $combination_name = '';
+            if (!empty($row['id_product_attribute']) && $row['id_product_attribute'] > 0) {
+                $combination = new Combination($row['id_product_attribute']);
+                if (Validate::isLoadedObject($combination)) {
+                    $attributes = $combination->getAttributesName($this->context->language->id);
+                    if (is_array($attributes) && count($attributes) > 0) {
+                        $attr_names = array();
+                        foreach ($attributes as $attr) {
+                            $attr_names[] = $attr['name'];
+                        }
+                        $combination_name = implode(', ', $attr_names);
+                    }
+                }
+            }
+
             $data = array(
                 $row['id_stock_audit'],
                 $row['date_add'],
                 $row['product_name'],
-                $row['reference'],
-                !empty($row['combination_name']) && $row['combination_name'] != ' - ' ? $row['combination_name'] : '',
+                !empty($row['reference']) ? $row['reference'] : '',
+                $combination_name,
                 $row['quantity_before'],
                 $row['quantity_after'],
                 $row['quantity_diff'],
@@ -377,9 +402,9 @@ class AdminStockAuditController extends ModuleAdminController
                 $row['movement_source'],
                 !empty($row['employee_name']) && trim($row['employee_name']) != '' ? $row['employee_name'] : 'Sistema/Cliente',
                 !empty($row['id_order']) ? $row['id_order'] : '',
-                $row['reason'],
-                $row['ip_address'],
-                $row['user_agent']
+                !empty($row['reason']) ? $row['reason'] : '',
+                !empty($row['ip_address']) ? $row['ip_address'] : '',
+                !empty($row['user_agent']) ? $row['user_agent'] : ''
             );
 
             fputcsv($fd, $data, ';', $text_delimiter);
