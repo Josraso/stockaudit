@@ -1,0 +1,13 @@
+<?php
+/**
+ * Para añadir un logo al módulo:
+ * 
+ * 1. Crea una imagen PNG de 32x32 píxeles
+ * 2. Nómbrala como: logo.png
+ * 3. Colócala en esta misma carpeta: /modules/stockaudit/
+ * 
+ * El módulo la detectará automáticamente.
+ * 
+ * También puedes crear un logo de 64x64 para resoluciones altas:
+ * - logo@2x.png (64x64 píxeles)
+ */

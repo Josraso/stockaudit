@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<module>
+    <name>stockaudit</name>
+    <displayName><![CDATA[Stock Audit - Auditoría de Stock]]></displayName>
+    <version><![CDATA[1.1.0]]></version>
+    <description><![CDATA[Registra y audita todos los movimientos de stock de tus productos. Compatible con PrestaShop 1.6, 1.7, 8 y 9.]]></description>
+    <author><![CDATA[Tu Nombre]]></author>
+    <tab><![CDATA[administration]]></tab>
+    <is_configurable>1</is_configurable>
+    <need_instance>0</need_instance>
+    <limited_countries></limited_countries>
+</module>
