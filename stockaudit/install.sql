@@ -28,7 +28,8 @@ CREATE TABLE IF NOT EXISTS `ps_stock_audit` (
     KEY `id_product` (`id_product`),
     KEY `id_product_attribute` (`id_product_attribute`),
     KEY `date_add` (`date_add`),
-    KEY `movement_type` (`movement_type`)
+    KEY `movement_type` (`movement_type`),
+    KEY `id_order` (`id_order`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 -- =====================================================

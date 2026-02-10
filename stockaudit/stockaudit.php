@@ -92,7 +92,8 @@ class StockAudit extends Module
             KEY `id_product` (`id_product`),
             KEY `id_product_attribute` (`id_product_attribute`),
             KEY `date_add` (`date_add`),
-            KEY `movement_type` (`movement_type`)
+            KEY `movement_type` (`movement_type`),
+            KEY `id_order` (`id_order`)
         ) ENGINE=' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8;';
 
         return Db::getInstance()->execute($sql);
@@ -292,6 +293,10 @@ class StockAudit extends Module
         $context = Context::getContext();
         $id_employee = isset($context->employee->id) ? (int)$context->employee->id : null;
         
+        $user_agent = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '';
+        // Truncar user_agent a 255 caracteres para evitar errores
+        $user_agent = Tools::substr($user_agent, 0, 255);
+
         $data = array(
             'id_product' => (int)$id_product,
             'id_product_attribute' => (int)$id_product_attribute,
@@ -304,7 +309,7 @@ class StockAudit extends Module
             'movement_source' => pSQL($this->getMovementSource()),
             'reason' => pSQL($reason),
             'date_add' => date('Y-m-d H:i:s'),
-            'user_agent' => pSQL(isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : ''),
+            'user_agent' => pSQL($user_agent),
             'ip_address' => pSQL(Tools::getRemoteAddr())
         );
 

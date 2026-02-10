@@ -76,7 +76,7 @@ class AdminStockAuditController extends ModuleAdminController
             ),
             'employee_name' => array(
                 'title' => $this->l('Usuario'),
-                'filter_key' => 'CONCAT(e.firstname, " ", e.lastname)',
+                'filter_key' => 'e!firstname',
                 'callback' => 'formatEmployee'
             ),
             'movement_source' => array(
