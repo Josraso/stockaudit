@@ -44,7 +44,10 @@ class StockAudit extends Module
         $install = parent::install()
             && $this->installDB()
             && $this->registerHook('actionUpdateQuantity')
-            && $this->registerHook('actionObjectStockAvailableUpdateAfter')
+            && $this->registerHook('actionObjectStockAvailableUpdateAfter')  // PS 1.7+
+            && $this->registerHook('actionProductUpdate')  // PS 1.6+
+            && $this->registerHook('displayAdminProductsQuantitiesStepBottom')  // PS 1.7+
+            && $this->registerHook('actionAdminControllerSetMedia')  // Para detectar controlador
             && $this->registerHook('actionValidateOrder')
             && $this->registerHook('actionOrderStatusPostUpdate')
             && $this->installTab();
@@ -206,6 +209,75 @@ class StockAudit extends Module
             $movement_type,
             $reason,
             $id_order
+        );
+    }
+
+    /**
+     * Hook: Actualización de producto (PS 1.6+)
+     * Se dispara cuando se guarda un producto desde el backoffice
+     */
+    public function hookActionProductUpdate($params)
+    {
+        if (!isset($params['id_product'])) {
+            return;
+        }
+
+        $id_product = (int)$params['id_product'];
+        $product = new Product($id_product);
+
+        if (!Validate::isLoadedObject($product)) {
+            return;
+        }
+
+        // Verificar si el producto tiene combinaciones
+        $combinations = $product->getAttributeCombinations($this->context->language->id);
+
+        if (empty($combinations)) {
+            // Producto simple - verificar cambio de stock
+            $this->checkAndRegisterStockChange($id_product, 0, 'manual_update', 'Edición desde ficha de producto');
+        } else {
+            // Producto con combinaciones - verificar cada combinación
+            $combination_ids = array();
+            foreach ($combinations as $combination) {
+                $id_product_attribute = (int)$combination['id_product_attribute'];
+                if (!in_array($id_product_attribute, $combination_ids)) {
+                    $combination_ids[] = $id_product_attribute;
+                    $this->checkAndRegisterStockChange($id_product, $id_product_attribute, 'manual_update', 'Edición desde ficha de producto');
+                }
+            }
+        }
+    }
+
+    /**
+     * Verificar y registrar cambio de stock
+     */
+    private function checkAndRegisterStockChange($id_product, $id_product_attribute, $movement_type, $reason)
+    {
+        // Stock ACTUAL en la BD
+        $quantity_after = $this->getProductStock($id_product, $id_product_attribute);
+
+        // Último stock registrado
+        $quantity_before = $this->getLastRecordedStock($id_product, $id_product_attribute);
+
+        // Si no hay registro previo, no registrar (ya se registró en stock inicial)
+        if ($quantity_before === null) {
+            return;
+        }
+
+        // NO registrar si no hay cambio
+        if ($quantity_before == $quantity_after) {
+            return;
+        }
+
+        // Registrar el cambio
+        $this->logStockMovement(
+            $id_product,
+            $id_product_attribute,
+            $quantity_before,
+            $quantity_after,
+            $movement_type,
+            $reason,
+            null
         );
     }
 
