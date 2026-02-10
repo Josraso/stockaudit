@@ -130,7 +130,7 @@ class AdminStockAuditController extends ModuleAdminController
      */
     protected function _select()
     {
-        $this->_select = 'p.`reference`,
+        $this->_select = 'IFNULL(pa.`reference`, p.`reference`) AS `reference`,
             IFNULL(pl.`name`, "Producto eliminado") AS `product_name`,
             CONCAT(IFNULL(e.`firstname`, ""), " ", IFNULL(e.`lastname`, "")) AS `employee_name`';
     }
@@ -143,6 +143,7 @@ class AdminStockAuditController extends ModuleAdminController
         $id_lang = (int)$this->context->language->id;
 
         $this->_join = 'LEFT JOIN `' . _DB_PREFIX_ . 'product` p ON (p.`id_product` = a.`id_product`)
+            LEFT JOIN `' . _DB_PREFIX_ . 'product_attribute` pa ON (pa.`id_product_attribute` = a.`id_product_attribute` AND a.`id_product_attribute` != 0)
             LEFT JOIN `' . _DB_PREFIX_ . 'product_lang` pl ON (pl.`id_product` = a.`id_product` AND pl.`id_lang` = ' . $id_lang . ')
             LEFT JOIN `' . _DB_PREFIX_ . 'employee` e ON (e.`id_employee` = a.`id_employee`)';
     }
