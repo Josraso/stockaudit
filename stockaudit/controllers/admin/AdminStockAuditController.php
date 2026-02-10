@@ -22,6 +22,9 @@ class AdminStockAuditController extends ModuleAdminController
         $this->_defaultOrderBy = 'id_stock_audit';
         $this->_defaultOrderWay = 'DESC';
 
+        // Desactivar edición (los registros de auditoría no se editan)
+        $this->actions = array('view', 'delete');
+
         parent::__construct();
 
         // Forzar ejecución de JOINs y SELECT
@@ -115,6 +118,71 @@ class AdminStockAuditController extends ModuleAdminController
 
         return $this->context->smarty->fetch(_PS_MODULE_DIR_ . 'stockaudit/views/templates/admin/stats.tpl')
             . parent::renderList();
+    }
+
+    /**
+     * Renderizar vista de detalle
+     */
+    public function renderView()
+    {
+        $id_stock_audit = (int)Tools::getValue('id_stock_audit');
+
+        if (!$id_stock_audit) {
+            $this->errors[] = $this->l('ID de auditoría inválido');
+            return;
+        }
+
+        // Obtener datos completos del registro
+        $sql = 'SELECT a.*,
+                p.`reference` AS product_reference,
+                pa.`reference` AS combination_reference,
+                pl.`name` AS product_name,
+                CONCAT(e.`firstname`, " ", e.`lastname`) AS employee_name,
+                o.`reference` AS order_reference
+            FROM `' . _DB_PREFIX_ . 'stock_audit` a
+            LEFT JOIN `' . _DB_PREFIX_ . 'product` p ON (p.`id_product` = a.`id_product`)
+            LEFT JOIN `' . _DB_PREFIX_ . 'product_attribute` pa ON (pa.`id_product_attribute` = a.`id_product_attribute` AND a.`id_product_attribute` != 0)
+            LEFT JOIN `' . _DB_PREFIX_ . 'product_lang` pl ON (pl.`id_product` = a.`id_product` AND pl.`id_lang` = ' . (int)$this->context->language->id . ')
+            LEFT JOIN `' . _DB_PREFIX_ . 'employee` e ON (e.`id_employee` = a.`id_employee`)
+            LEFT JOIN `' . _DB_PREFIX_ . 'orders` o ON (o.`id_order` = a.`id_order`)
+            WHERE a.`id_stock_audit` = ' . $id_stock_audit;
+
+        $record = Db::getInstance()->getRow($sql);
+
+        if (!$record) {
+            $this->errors[] = $this->l('Registro no encontrado');
+            return;
+        }
+
+        // Obtener información de combinación si existe
+        $combination_name = '';
+        if (!empty($record['id_product_attribute']) && $record['id_product_attribute'] > 0) {
+            $combination = new Combination($record['id_product_attribute']);
+            if (Validate::isLoadedObject($combination)) {
+                $attributes = $combination->getAttributesName($this->context->language->id);
+                if (is_array($attributes) && count($attributes) > 0) {
+                    $attr_names = array();
+                    foreach ($attributes as $attr) {
+                        $attr_names[] = $attr['name'];
+                    }
+                    $combination_name = implode(', ', $attr_names);
+                }
+            }
+        }
+
+        // Determinar referencia a mostrar
+        $reference = !empty($record['combination_reference']) ? $record['combination_reference'] : $record['product_reference'];
+
+        // Preparar datos para la vista
+        $this->tpl_view_vars = array(
+            'record' => $record,
+            'combination_name' => $combination_name,
+            'reference' => $reference,
+            'movement_types' => $this->getMovementTypes(),
+            'back_url' => self::$currentIndex . '&token=' . $this->token
+        );
+
+        return parent::renderView();
     }
 
     /**

@@ -156,19 +156,23 @@ class StockAudit extends Module
     {
         $id_product = (int)$params['id_product'];
         $id_product_attribute = isset($params['id_product_attribute']) ? (int)$params['id_product_attribute'] : 0;
-        
-        // Obtener stock actual ANTES del cambio
-        $quantity_before = $this->getProductStock($id_product, $id_product_attribute);
-        
-        // Calcular nuevo stock
-        $delta_quantity = isset($params['delta_quantity']) ? (int)$params['delta_quantity'] : 0;
-        $quantity_after = $quantity_before + $delta_quantity;
-        
+
+        // Obtener stock ANTES del cambio desde el último registro de auditoría
+        $quantity_before = $this->getLastRecordedStock($id_product, $id_product_attribute);
+
+        // Si no hay registro previo, usar el stock actual de la BD
+        if ($quantity_before === null) {
+            $quantity_before = $this->getProductStock($id_product, $id_product_attribute);
+        }
+
+        // El stock DESPUÉS del cambio siempre viene de la BD (ya está actualizado)
+        $quantity_after = $this->getProductStock($id_product, $id_product_attribute);
+
         // Determinar el tipo de movimiento
         $movement_type = 'update';
         $reason = 'Actualización de cantidad';
         $id_order = null;
-        
+
         // Contexto más específico
         if (isset($params['id_order']) && $params['id_order'] > 0) {
             $movement_type = 'order';
@@ -182,7 +186,7 @@ class StockAudit extends Module
                 $reason = $stock_reason->name;
             }
         }
-        
+
         $this->logStockMovement(
             $id_product,
             $id_product_attribute,
@@ -217,22 +221,34 @@ class StockAudit extends Module
         if (isset($params['object']) && $params['object'] instanceof Product) {
             $product = $params['object'];
             $id_product = (int)$product->id;
-            
+
             // Solo para productos sin combinaciones
             if (!$product->hasCombinations()) {
-                $current_stock = $this->getProductStock($id_product, 0);
-                
-                // Verificar si hubo cambio de stock comparando con el último registro
-                $last_stock = $this->getLastRecordedStock($id_product, 0);
-                
-                if ($last_stock !== null && $current_stock != $last_stock) {
+                // Stock ANTES = último registrado en auditoría
+                $quantity_before = $this->getLastRecordedStock($id_product, 0);
+
+                // Stock DESPUÉS = actual en la BD
+                $quantity_after = $this->getProductStock($id_product, 0);
+
+                // Si hay registro previo y el stock cambió, registrar
+                if ($quantity_before !== null && $quantity_after != $quantity_before) {
                     $this->logStockMovement(
                         $id_product,
                         0,
-                        $last_stock,
-                        $current_stock,
+                        $quantity_before,
+                        $quantity_after,
                         'manual_update',
                         'Actualización manual desde backoffice'
+                    );
+                } elseif ($quantity_before === null) {
+                    // Si no hay registro previo, es la primera vez que se registra
+                    $this->logStockMovement(
+                        $id_product,
+                        0,
+                        0,
+                        $quantity_after,
+                        'initial_stock',
+                        'Stock inicial del producto'
                     );
                 }
             }
