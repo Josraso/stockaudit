@@ -16,7 +16,6 @@ class AdminStockAuditController extends ModuleAdminController
         $this->table = 'stock_audit';
         $this->className = 'StockAuditModel';
         $this->lang = false;
-        $this->explicitSelect = true;
         $this->allow_export = true;
         $this->deleted = false;
         $this->context = Context::getContext();
@@ -44,12 +43,10 @@ class AdminStockAuditController extends ModuleAdminController
             ),
             'product_name' => array(
                 'title' => $this->l('Producto'),
-                'filter_key' => 'pl!name',
                 'callback' => 'formatProductName'
             ),
             'reference' => array(
-                'title' => $this->l('Referencia'),
-                'filter_key' => 'p!reference'
+                'title' => $this->l('Referencia')
             ),
             'quantity_before' => array(
                 'title' => $this->l('Stock Anterior'),
@@ -76,7 +73,6 @@ class AdminStockAuditController extends ModuleAdminController
             ),
             'employee_name' => array(
                 'title' => $this->l('Usuario'),
-                'filter_key' => 'e!firstname',
                 'callback' => 'formatEmployee'
             ),
             'movement_source' => array(
@@ -128,20 +124,7 @@ class AdminStockAuditController extends ModuleAdminController
      */
     protected function _select()
     {
-        $this->_select = 'a.`id_product`,
-            a.`id_product_attribute`,
-            a.`id_order`,
-            a.`id_employee`,
-            a.`quantity_before`,
-            a.`quantity_after`,
-            a.`quantity_diff`,
-            a.`movement_type`,
-            a.`movement_source`,
-            a.`reason`,
-            a.`date_add`,
-            a.`user_agent`,
-            a.`ip_address`,
-            p.`reference`,
+        $this->_select = 'p.`reference`,
             IFNULL(pl.`name`, "Producto eliminado") AS `product_name`,
             CONCAT(IFNULL(e.`firstname`, ""), " ", IFNULL(e.`lastname`, "")) AS `employee_name`';
     }
