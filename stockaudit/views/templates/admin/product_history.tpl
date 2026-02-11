@@ -32,7 +32,6 @@
                         <th>{l s='Razón' mod='stockaudit'}</th>
                         <th>{l s='Usuario' mod='stockaudit'}</th>
                         <th>{l s='Pedido' mod='stockaudit'}</th>
-                        <th class="text-center">{l s='Acción' mod='stockaudit'}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -93,13 +92,6 @@
                                 {else}
                                     -
                                 {/if}
-                            </td>
-                            <td class="text-center">
-                                <a href="index.php?controller=AdminStockAudit&id_stock_audit={$movement.id_stock_audit|escape:'html':'UTF-8'}&viewstock_audit&token={Tools::getAdminTokenLite('AdminStockAudit')}"
-                                   class="btn btn-default btn-xs"
-                                   title="{l s='Ver detalles completos' mod='stockaudit'}">
-                                    <i class="icon-eye"></i>
-                                </a>
                             </td>
                         </tr>
                     {/foreach}

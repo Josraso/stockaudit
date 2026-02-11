@@ -199,22 +199,29 @@ class StockAudit extends Module
         $ps_override_file = _PS_OVERRIDE_DIR_ . 'classes/StockAvailable.php';
 
         if (file_exists($ps_override_file)) {
-            // Verificar que es nuestro override antes de eliminarlo
+            // Leer contenido del override
             $content = @file_get_contents($ps_override_file);
+
+            // Solo eliminar si es nuestro override
             if ($content && strpos($content, 'stockaudit') !== false) {
-                if (!@unlink($ps_override_file)) {
-                    $this->_errors[] = 'Failed to delete override file';
-                    return false;
-                }
+                // Eliminar el archivo
+                @unlink($ps_override_file);
             }
+        }
+
+        // Limpiar el class_index.php ANTES de regenerar
+        $class_index = _PS_ROOT_DIR_ . '/cache/class_index.php';
+        if (file_exists($class_index)) {
+            @unlink($class_index);
         }
 
         // Regenerar el class_index.php
         try {
-            if (method_exists('Tools', 'generateIndex')) {
+            if (class_exists('Tools') && method_exists('Tools', 'generateIndex')) {
                 Tools::generateIndex();
             }
         } catch (Exception $e) {
+            // Si falla, al menos intentamos limpiar la caché
             $this->clearCache();
         }
 
