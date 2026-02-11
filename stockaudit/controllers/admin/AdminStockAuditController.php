@@ -111,6 +111,8 @@ class AdminStockAuditController extends ModuleAdminController
             // Handler para el botón de expandir/colapsar
             $(document).on("click", ".btn-expand-movements", function(e) {
                 e.preventDefault();
+                e.stopPropagation(); // Evitar propagación del evento
+
                 var btn = $(this);
                 var icon = btn.find("i");
                 var idProduct = btn.data("id-product");
@@ -124,7 +126,7 @@ class AdminStockAuditController extends ModuleAdminController
                     nextRows.remove();
                     icon.removeClass("icon-minus").addClass("icon-plus");
                     btn.attr("title", "' . $this->l('Expandir movimientos') . '");
-                    return;
+                    return false;
                 }
 
                 // Mostrar loading
@@ -152,11 +154,14 @@ class AdminStockAuditController extends ModuleAdminController
                             alert("' . $this->l('No hay movimientos anteriores') . '");
                         }
                     },
-                    error: function() {
+                    error: function(xhr, status, error) {
+                        console.error("Error AJAX:", status, error);
                         icon.removeClass("icon-spinner icon-spin").addClass("icon-plus");
                         alert("' . $this->l('Error al cargar movimientos') . '");
                     }
                 });
+
+                return false; // Evitar cualquier acción por defecto
             });
         });
         </script>
@@ -580,7 +585,7 @@ class AdminStockAuditController extends ModuleAdminController
     }
 
     /**
-     * Formatear acciones (botón expandir y botón ver detalle)
+     * Formatear acciones (solo botón expandir)
      */
     public function formatActions($value, $row)
     {
@@ -588,7 +593,7 @@ class AdminStockAuditController extends ModuleAdminController
         $id_product_attribute = (int)$row['id_product_attribute'];
         $id_stock_audit = (int)$row['id_stock_audit'];
 
-        // Botón expandir/colapsar movimientos previos
+        // Solo botón expandir - el botón Ver ya existe en la columna estándar
         $expand_btn = '<button class="btn btn-default btn-xs btn-expand-movements"
                               data-id-product="' . $id_product . '"
                               data-id-product-attribute="' . $id_product_attribute . '"
@@ -597,16 +602,7 @@ class AdminStockAuditController extends ModuleAdminController
                             <i class="icon-plus"></i>
                        </button>';
 
-        // Botón ver detalle completo de ESTE movimiento
-        $view_url = self::$currentIndex . '&id_stock_audit=' . $id_stock_audit . '&viewstock_audit&token=' . $this->token;
-
-        $view_btn = '<a href="' . $view_url . '"
-                        class="btn btn-default btn-xs"
-                        title="' . $this->l('Ver detalle completo') . '">
-                        <i class="icon-eye"></i>
-                    </a>';
-
-        return $expand_btn . ' ' . $view_btn;
+        return $expand_btn;
     }
 
     /**
