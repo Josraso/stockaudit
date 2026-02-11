@@ -598,7 +598,7 @@ class AdminStockAuditController extends ModuleAdminController
         $id_stock_audit = (int)$row['id_stock_audit'];
 
         // Botón expandir movimientos previos
-        $expand_btn = '<button class="btn btn-default btn-xs btn-expand-movements"
+        $expand_btn = '<button type="button" class="btn btn-default btn-xs btn-expand-movements"
                               data-id-product="' . $id_product . '"
                               data-id-product-attribute="' . $id_product_attribute . '"
                               data-id-audit="' . $id_stock_audit . '"

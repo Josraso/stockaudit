@@ -158,11 +158,24 @@ class StockAudit extends Module
      */
     private function installOverride()
     {
-        // PrestaShop maneja los overrides automáticamente desde la carpeta override/
-        // Solo necesitamos asegurarnos de que el archivo existe
-        $override_file = dirname(__FILE__) . '/override/classes/StockAvailable.php';
+        $module_override = dirname(__FILE__) . '/override/classes/StockAvailable.php';
+        $ps_override_dir = _PS_OVERRIDE_DIR_ . 'classes/';
+        $ps_override_file = $ps_override_dir . 'StockAvailable.php';
 
-        if (!file_exists($override_file)) {
+        // Verificar que el override del módulo existe
+        if (!file_exists($module_override)) {
+            $this->_errors[] = 'Override file not found in module';
+            return false;
+        }
+
+        // Crear directorio si no existe
+        if (!file_exists($ps_override_dir)) {
+            @mkdir($ps_override_dir, 0755, true);
+        }
+
+        // Copiar el override al directorio de PrestaShop
+        if (!@copy($module_override, $ps_override_file)) {
+            $this->_errors[] = 'Failed to copy override file';
             return false;
         }
 
@@ -172,7 +185,6 @@ class StockAudit extends Module
                 Tools::generateIndex();
             }
         } catch (Exception $e) {
-            // Si falla, intentar manualmente
             $this->clearCache();
         }
 
@@ -184,14 +196,16 @@ class StockAudit extends Module
      */
     private function uninstallOverride()
     {
-        // Eliminar el override del directorio de PrestaShop
         $ps_override_file = _PS_OVERRIDE_DIR_ . 'classes/StockAvailable.php';
 
         if (file_exists($ps_override_file)) {
             // Verificar que es nuestro override antes de eliminarlo
-            $content = file_get_contents($ps_override_file);
-            if (strpos($content, 'stockaudit') !== false) {
-                @unlink($ps_override_file);
+            $content = @file_get_contents($ps_override_file);
+            if ($content && strpos($content, 'stockaudit') !== false) {
+                if (!@unlink($ps_override_file)) {
+                    $this->_errors[] = 'Failed to delete override file';
+                    return false;
+                }
             }
         }
 
