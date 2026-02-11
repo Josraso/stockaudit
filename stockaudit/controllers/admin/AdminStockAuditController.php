@@ -100,91 +100,8 @@ class AdminStockAuditController extends ModuleAdminController
             'stats' => $this->getStatistics()
         ));
 
-        $ajax_url = self::$currentIndex . '&ajax=1&action=getProductMovements&token=' . $this->token;
-
-        $javascript = '
-        <script type="text/javascript">
-        $(document).ready(function() {
-            // Prevenir submit de formularios cuando se hace click en botones de expand
-            $("form").on("submit", function(e) {
-                if ($(".icon-spinner").length > 0) {
-                    e.preventDefault();
-                    return false;
-                }
-            });
-
-            // Handler para el botón de expandir/colapsar
-            $(document).on("click", ".btn-expand-movements", function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                e.stopImmediatePropagation();
-
-                var btn = $(this);
-                var icon = btn.find("i");
-                var idProduct = btn.data("id-product");
-                var idProductAttribute = btn.data("id-product-attribute");
-                var idAudit = btn.data("id-audit");
-                var row = btn.closest("tr");
-                var nextRows = row.nextUntil("tr:not(.expanded-row)");
-
-                // Si ya está expandido, colapsar
-                if (icon.hasClass("icon-minus")) {
-                    nextRows.remove();
-                    icon.removeClass("icon-minus").addClass("icon-plus");
-                    btn.attr("title", "' . $this->l('Expandir movimientos') . '");
-                    return false;
-                }
-
-                // Mostrar loading
-                icon.removeClass("icon-plus").addClass("icon-spinner icon-spin");
-
-                // Hacer petición AJAX
-                $.ajax({
-                    url: "' . $ajax_url . '",
-                    type: "GET",
-                    data: {
-                        id_product: idProduct,
-                        id_product_attribute: idProductAttribute,
-                        id_audit: idAudit
-                    },
-                    dataType: "json",
-                    success: function(response) {
-                        setTimeout(function() {
-                            icon.removeClass("icon-spinner icon-spin");
-                            if (response.success && response.html) {
-                                // Insertar filas expandidas después de la fila actual
-                                row.after(response.html);
-                                icon.removeClass("icon-plus").addClass("icon-minus");
-                                btn.attr("title", "' . $this->l('Colapsar movimientos') . '");
-                            } else {
-                                icon.addClass("icon-plus");
-                                alert("' . $this->l('No hay movimientos anteriores') . '");
-                            }
-                        }, 100);
-                    },
-                    error: function(xhr, status, error) {
-                        console.error("Error AJAX:", status, error);
-                        icon.removeClass("icon-spinner icon-spin").addClass("icon-plus");
-                        alert("' . $this->l('Error al cargar movimientos') . '");
-                    }
-                });
-
-                return false;
-            });
-        });
-        </script>
-        <style>
-        .expanded-row {
-            background-color: #f9f9f9 !important;
-        }
-        .btn-expand-movements {
-            margin-right: 5px;
-        }
-        </style>';
-
         return $this->context->smarty->fetch(_PS_MODULE_DIR_ . 'stockaudit/views/templates/admin/stats.tpl')
-            . parent::renderList()
-            . $javascript;
+            . parent::renderList();
     }
 
     /**
@@ -258,12 +175,6 @@ class AdminStockAuditController extends ModuleAdminController
      */
     public function initContent()
     {
-        // AJAX: Obtener movimientos de un producto
-        if (Tools::getValue('ajax') && Tools::getValue('action') == 'getProductMovements') {
-            $this->ajaxGetProductMovements();
-            return;
-        }
-
         if (Tools::getValue('viewproduct')) {
             $this->display = 'viewproduct';
             $this->content = $this->renderProductHistory();
@@ -619,35 +530,27 @@ class AdminStockAuditController extends ModuleAdminController
     }
 
     /**
-     * Formatear acciones (botón expandir + botón ver)
+     * Formatear acciones (botón ver historial completo)
      */
     public function formatActions($value, $row)
     {
         $id_product = (int)$row['id_product'];
         $id_product_attribute = (int)$row['id_product_attribute'];
-        $id_stock_audit = (int)$row['id_stock_audit'];
 
-        // Botón expandir movimientos previos
-        $expand_btn = '<button type="button" class="btn btn-default btn-xs btn-expand-movements"
-                              data-id-product="' . $id_product . '"
-                              data-id-product-attribute="' . $id_product_attribute . '"
-                              data-id-audit="' . $id_stock_audit . '"
-                              onclick="return false;"
-                              title="' . $this->l('Ver movimientos anteriores') . '"
-                              style="margin-right: 3px;">
-                            <i class="icon-plus"></i>
-                       </button>';
+        // Botón ver historial completo del producto
+        $history_url = self::$currentIndex . '&viewproduct&id_product=' . $id_product;
+        if ($id_product_attribute > 0) {
+            $history_url .= '&id_product_attribute=' . $id_product_attribute;
+        }
+        $history_url .= '&token=' . $this->token;
 
-        // Botón ver detalle
-        $view_url = self::$currentIndex . '&id_stock_audit=' . $id_stock_audit . '&viewstock_audit&token=' . $this->token;
-        $view_btn = '<a href="' . $view_url . '"
-                       class="btn btn-default btn-xs"
-                       onclick="event.stopPropagation();"
-                       title="' . $this->l('Ver detalle') . '">
-                        <i class="icon-eye"></i>
-                    </a>';
+        $history_btn = '<a href="' . $history_url . '"
+                           class="btn btn-default btn-xs"
+                           title="' . $this->l('Ver historial completo') . '">
+                            <i class="icon-list"></i> ' . $this->l('Historial') . '
+                        </a>';
 
-        return $expand_btn . ' ' . $view_btn;
+        return $history_btn;
     }
 
     /**
