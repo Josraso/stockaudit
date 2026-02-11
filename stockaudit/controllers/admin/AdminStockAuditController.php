@@ -497,6 +497,26 @@ class AdminStockAuditController extends ModuleAdminController
     }
 
     /**
+     * Query WHERE personalizada - Añadir búsqueda por referencia
+     */
+    protected function _where()
+    {
+        // Si hay búsqueda por nombre de producto, también buscar en referencias
+        if (Tools::getValue('product_nameFilter')) {
+            $search = pSQL(Tools::getValue('product_nameFilter'));
+            // Añadir búsqueda en referencias (tanto producto padre como combinación)
+            $this->_where .= ' AND (
+                pl.`name` LIKE "%' . $search . '%"
+                OR p.`reference` LIKE "%' . $search . '%"
+                OR pa.`reference` LIKE "%' . $search . '%"
+            )';
+
+            // Limpiar el filtro por defecto para evitar duplicados
+            $_GET['product_nameFilter'] = '';
+        }
+    }
+
+    /**
      * Tipos de movimiento
      */
     private function getMovementTypes()
