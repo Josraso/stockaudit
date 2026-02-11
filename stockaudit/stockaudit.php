@@ -441,19 +441,41 @@ class StockAudit extends Module
     {
         if (isset($params['order'])) {
             $order = $params['order'];
-            
+
             foreach ($order->getProducts() as $product) {
+                $id_product = (int)$product['product_id'];
+                $id_product_attribute = (int)$product['product_attribute_id'];
+
+                // Obtener stock actual ANTES de que se decremente
+                $quantity_before = $this->getProductStock($id_product, $id_product_attribute);
+
+                // El stock después será el stock actual menos la cantidad del pedido
+                $quantity_after = $quantity_before - (int)$product['product_quantity'];
+
+                // Registrar la reserva/venta
                 $this->logStockMovement(
-                    (int)$product['product_id'],
-                    (int)$product['product_attribute_id'],
-                    0, // Se actualizará con el hook actionUpdateQuantity
-                    0,
-                    'order_validation',
-                    'Validación de pedido #' . (int)$order->id,
+                    $id_product,
+                    $id_product_attribute,
+                    $quantity_before,
+                    $quantity_after,
+                    'order',
+                    'Pedido #' . (int)$order->id . ' (' . (int)$product['product_quantity'] . ' unidades)',
                     (int)$order->id
                 );
             }
         }
+    }
+
+    /**
+     * Hook: Cambio de estado de pedido
+     */
+    public function hookActionOrderStatusPostUpdate($params)
+    {
+        // Este hook se ejecuta cuando cambia el estado del pedido
+        // No necesitamos registrar aquí porque el override de StockAvailable
+        // ya capturará el cambio real de stock
+        // Este comentario es para documentación
+        return;
     }
 
     /**
