@@ -52,7 +52,9 @@ class AdminStockAuditController extends ModuleAdminController
             ),
             'ref_display' => array(
                 'title' => $this->l('Ref.'),
-                'align' => 'center'
+                'align' => 'center',
+                'search' => false,  // Es un alias, no puede usarse en WHERE
+                'orderby' => false
             ),
             'stock_change' => array(
                 'title' => $this->l('Cambio de Stock'),
@@ -153,11 +155,13 @@ class AdminStockAuditController extends ModuleAdminController
                             icon.addClass("icon-plus");
                             alert("' . $this->l('No hay movimientos anteriores') . '");
                         }
+                        return false;
                     },
                     error: function(xhr, status, error) {
                         console.error("Error AJAX:", status, error);
                         icon.removeClass("icon-spinner icon-spin").addClass("icon-plus");
                         alert("' . $this->l('Error al cargar movimientos') . '");
+                        return false;
                     }
                 });
 
