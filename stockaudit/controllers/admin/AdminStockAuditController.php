@@ -22,8 +22,9 @@ class AdminStockAuditController extends ModuleAdminController
         $this->_defaultOrderBy = 'id_stock_audit';
         $this->_defaultOrderWay = 'DESC';
 
-        // Desactivar edición y vista automática (usamos botones custom)
-        $this->actions = array('delete');
+        // Desactivar edición (los registros de auditoría no se editan)
+        // View redirige al historial del producto
+        $this->actions = array('view', 'delete');
 
         parent::__construct();
 
@@ -105,7 +106,7 @@ class AdminStockAuditController extends ModuleAdminController
     }
 
     /**
-     * Renderizar vista de detalle
+     * Renderizar vista de detalle - Redirige al historial del producto
      */
     public function renderView()
     {
@@ -113,61 +114,29 @@ class AdminStockAuditController extends ModuleAdminController
 
         if (!$id_stock_audit) {
             $this->errors[] = $this->l('ID de auditoría inválido');
-            return $this->context->smarty->fetch($this->template);
+            return '';
         }
 
-        // Obtener datos completos del registro
-        $sql = 'SELECT a.*,
-                p.`reference` AS product_reference,
-                pa.`reference` AS combination_reference,
-                pl.`name` AS product_name,
-                CONCAT(e.`firstname`, " ", e.`lastname`) AS employee_name,
-                o.`reference` AS order_reference
-            FROM `' . _DB_PREFIX_ . 'stock_audit` a
-            LEFT JOIN `' . _DB_PREFIX_ . 'product` p ON (p.`id_product` = a.`id_product`)
-            LEFT JOIN `' . _DB_PREFIX_ . 'product_attribute` pa ON (pa.`id_product_attribute` = a.`id_product_attribute` AND a.`id_product_attribute` != 0)
-            LEFT JOIN `' . _DB_PREFIX_ . 'product_lang` pl ON (pl.`id_product` = a.`id_product` AND pl.`id_lang` = ' . (int)$this->context->language->id . ')
-            LEFT JOIN `' . _DB_PREFIX_ . 'employee` e ON (e.`id_employee` = a.`id_employee`)
-            LEFT JOIN `' . _DB_PREFIX_ . 'orders` o ON (o.`id_order` = a.`id_order`)
-            WHERE a.`id_stock_audit` = ' . $id_stock_audit;
+        // Obtener el id_product y id_product_attribute del movimiento
+        $sql = 'SELECT id_product, id_product_attribute
+                FROM `' . _DB_PREFIX_ . 'stock_audit`
+                WHERE id_stock_audit = ' . $id_stock_audit;
 
         $record = Db::getInstance()->getRow($sql);
 
         if (!$record) {
             $this->errors[] = $this->l('Registro no encontrado');
-            return $this->context->smarty->fetch($this->template);
+            return '';
         }
 
-        // Obtener información de combinación si existe
-        $combination_name = '';
-        if (!empty($record['id_product_attribute']) && $record['id_product_attribute'] > 0) {
-            $combination = new Combination($record['id_product_attribute']);
-            if (Validate::isLoadedObject($combination)) {
-                $attributes = $combination->getAttributesName($this->context->language->id);
-                if (is_array($attributes) && count($attributes) > 0) {
-                    $attr_names = array();
-                    foreach ($attributes as $attr) {
-                        $attr_names[] = $attr['name'];
-                    }
-                    $combination_name = implode(', ', $attr_names);
-                }
-            }
+        // Redirigir al historial del producto
+        $history_url = self::$currentIndex . '&viewproduct&id_product=' . (int)$record['id_product'];
+        if (!empty($record['id_product_attribute'])) {
+            $history_url .= '&id_product_attribute=' . (int)$record['id_product_attribute'];
         }
+        $history_url .= '&token=' . $this->token;
 
-        // Determinar referencia a mostrar
-        $reference = !empty($record['combination_reference']) ? $record['combination_reference'] : $record['product_reference'];
-
-        // Asignar variables a Smarty
-        $this->context->smarty->assign(array(
-            'record' => $record,
-            'combination_name' => $combination_name,
-            'reference' => $reference,
-            'movement_types' => $this->getMovementTypes(),
-            'back_url' => self::$currentIndex . '&token=' . $this->token
-        ));
-
-        // Cargar y retornar el template
-        return $this->context->smarty->fetch(_PS_MODULE_DIR_ . 'stockaudit/views/templates/admin/view.tpl');
+        Tools::redirectAdmin($history_url);
     }
 
     /**
@@ -176,9 +145,8 @@ class AdminStockAuditController extends ModuleAdminController
     public function initContent()
     {
         if (Tools::getValue('viewproduct')) {
-            $this->display = 'viewproduct';
             $this->content = $this->renderProductHistory();
-            return;
+            // NO return - dejar que parent renderice
         }
 
         parent::initContent();
