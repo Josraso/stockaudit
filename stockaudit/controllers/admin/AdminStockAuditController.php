@@ -104,10 +104,19 @@ class AdminStockAuditController extends ModuleAdminController
         $javascript = '
         <script type="text/javascript">
         $(document).ready(function() {
+            // Prevenir submit de formularios cuando se hace click en botones de expand
+            $("form").on("submit", function(e) {
+                if ($(".icon-spinner").length > 0) {
+                    e.preventDefault();
+                    return false;
+                }
+            });
+
             // Handler para el botón de expandir/colapsar
             $(document).on("click", ".btn-expand-movements", function(e) {
                 e.preventDefault();
-                e.stopPropagation(); // Evitar propagación del evento
+                e.stopPropagation();
+                e.stopImmediatePropagation();
 
                 var btn = $(this);
                 var icon = btn.find("i");
@@ -139,27 +148,27 @@ class AdminStockAuditController extends ModuleAdminController
                     },
                     dataType: "json",
                     success: function(response) {
-                        icon.removeClass("icon-spinner icon-spin");
-                        if (response.success && response.html) {
-                            // Insertar filas expandidas después de la fila actual
-                            row.after(response.html);
-                            icon.removeClass("icon-plus").addClass("icon-minus");
-                            btn.attr("title", "' . $this->l('Colapsar movimientos') . '");
-                        } else {
-                            icon.addClass("icon-plus");
-                            alert("' . $this->l('No hay movimientos anteriores') . '");
-                        }
-                        return false;
+                        setTimeout(function() {
+                            icon.removeClass("icon-spinner icon-spin");
+                            if (response.success && response.html) {
+                                // Insertar filas expandidas después de la fila actual
+                                row.after(response.html);
+                                icon.removeClass("icon-plus").addClass("icon-minus");
+                                btn.attr("title", "' . $this->l('Colapsar movimientos') . '");
+                            } else {
+                                icon.addClass("icon-plus");
+                                alert("' . $this->l('No hay movimientos anteriores') . '");
+                            }
+                        }, 100);
                     },
                     error: function(xhr, status, error) {
                         console.error("Error AJAX:", status, error);
                         icon.removeClass("icon-spinner icon-spin").addClass("icon-plus");
                         alert("' . $this->l('Error al cargar movimientos') . '");
-                        return false;
                     }
                 });
 
-                return false; // Evitar cualquier acción por defecto
+                return false;
             });
         });
         </script>
@@ -602,6 +611,7 @@ class AdminStockAuditController extends ModuleAdminController
                               data-id-product="' . $id_product . '"
                               data-id-product-attribute="' . $id_product_attribute . '"
                               data-id-audit="' . $id_stock_audit . '"
+                              onclick="return false;"
                               title="' . $this->l('Ver movimientos anteriores') . '"
                               style="margin-right: 3px;">
                             <i class="icon-plus"></i>
