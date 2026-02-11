@@ -22,8 +22,8 @@ class AdminStockAuditController extends ModuleAdminController
         $this->_defaultOrderBy = 'id_stock_audit';
         $this->_defaultOrderWay = 'DESC';
 
-        // Desactivar edición (los registros de auditoría no se editan)
-        $this->actions = array('view', 'delete');
+        // Desactivar edición y vista automática (usamos botones custom)
+        $this->actions = array('delete');
 
         parent::__construct();
 
@@ -589,7 +589,7 @@ class AdminStockAuditController extends ModuleAdminController
     }
 
     /**
-     * Formatear acciones (solo botón expandir)
+     * Formatear acciones (botón expandir + botón ver)
      */
     public function formatActions($value, $row)
     {
@@ -597,16 +597,26 @@ class AdminStockAuditController extends ModuleAdminController
         $id_product_attribute = (int)$row['id_product_attribute'];
         $id_stock_audit = (int)$row['id_stock_audit'];
 
-        // Solo botón expandir - el botón Ver ya existe en la columna estándar
+        // Botón expandir movimientos previos
         $expand_btn = '<button class="btn btn-default btn-xs btn-expand-movements"
                               data-id-product="' . $id_product . '"
                               data-id-product-attribute="' . $id_product_attribute . '"
                               data-id-audit="' . $id_stock_audit . '"
-                              title="' . $this->l('Ver movimientos anteriores') . '">
+                              title="' . $this->l('Ver movimientos anteriores') . '"
+                              style="margin-right: 3px;">
                             <i class="icon-plus"></i>
                        </button>';
 
-        return $expand_btn;
+        // Botón ver detalle
+        $view_url = self::$currentIndex . '&id_stock_audit=' . $id_stock_audit . '&viewstock_audit&token=' . $this->token;
+        $view_btn = '<a href="' . $view_url . '"
+                       class="btn btn-default btn-xs"
+                       onclick="event.stopPropagation();"
+                       title="' . $this->l('Ver detalle') . '">
+                        <i class="icon-eye"></i>
+                    </a>';
+
+        return $expand_btn . ' ' . $view_btn;
     }
 
     /**
