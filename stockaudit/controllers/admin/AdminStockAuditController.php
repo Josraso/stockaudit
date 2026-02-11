@@ -456,7 +456,9 @@ class AdminStockAuditController extends ModuleAdminController
             a.`id_product_attribute`,
             IFNULL(pa.`reference`, p.`reference`) AS `ref_display`,
             IFNULL(pl.`name`, "Producto eliminado") AS `product_name`,
-            CONCAT(IFNULL(e.`firstname`, ""), " ", IFNULL(e.`lastname`, "")) AS `employee_name`';
+            CONCAT(IFNULL(e.`firstname`, ""), " ", IFNULL(e.`lastname`, "")) AS `employee_name`,
+            a.`id_stock_audit` AS `stock_change`,
+            a.`id_stock_audit` AS `actions`';
     }
 
     /**
