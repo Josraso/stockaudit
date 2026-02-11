@@ -48,7 +48,8 @@ class AdminStockAuditController extends ModuleAdminController
             ),
             'product_name' => array(
                 'title' => $this->l('Producto'),
-                'callback' => 'formatProductNameCompact'
+                'callback' => 'formatProductNameCompact',
+                'filter_key' => 'pl!name'  // Búsqueda en tabla product_lang
             ),
             'stock_change' => array(
                 'title' => $this->l('Cambio de Stock'),
