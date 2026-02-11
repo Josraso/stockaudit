@@ -50,12 +50,6 @@ class AdminStockAuditController extends ModuleAdminController
                 'title' => $this->l('Producto'),
                 'callback' => 'formatProductNameCompact'
             ),
-            'ref_display' => array(
-                'title' => $this->l('Ref.'),
-                'align' => 'center',
-                'search' => false,  // Es un alias, no puede usarse en WHERE
-                'orderby' => false
-            ),
             'stock_change' => array(
                 'title' => $this->l('Cambio de Stock'),
                 'align' => 'center',
@@ -526,11 +520,17 @@ class AdminStockAuditController extends ModuleAdminController
     }
 
     /**
-     * Formatear nombre del producto compacto (sin botones)
+     * Formatear nombre del producto compacto (incluye referencia)
      */
     public function formatProductNameCompact($value, $row)
     {
+        // Nombre del producto
         $name = '<strong>' . $value . '</strong>';
+
+        // Añadir referencia si existe
+        if (!empty($row['ref_display'])) {
+            $name .= ' <span class="label label-default">' . $row['ref_display'] . '</span>';
+        }
 
         // Si tiene combinación, añadirla en la misma línea
         if (!empty($row['id_product_attribute']) && $row['id_product_attribute'] > 0) {
@@ -542,7 +542,7 @@ class AdminStockAuditController extends ModuleAdminController
                     foreach ($attributes as $attr) {
                         $attr_names[] = $attr['name'];
                     }
-                    $name .= ' <small class="text-muted">(' . implode(', ', $attr_names) . ')</small>';
+                    $name .= '<br><small class="text-muted">(' . implode(', ', $attr_names) . ')</small>';
                 }
             }
         }
