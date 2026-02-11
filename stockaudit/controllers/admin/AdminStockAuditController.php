@@ -106,7 +106,7 @@ class AdminStockAuditController extends ModuleAdminController
     }
 
     /**
-     * Renderizar vista de detalle - Redirige al historial del producto
+     * Renderizar vista - Muestra historial del producto directamente
      */
     public function renderView()
     {
@@ -129,24 +129,25 @@ class AdminStockAuditController extends ModuleAdminController
             return '';
         }
 
-        // Redirigir al historial del producto
-        $history_url = self::$currentIndex . '&viewproduct&id_product=' . (int)$record['id_product'];
+        // Guardar en variables para usar en renderProductHistory
+        $_GET['id_product'] = $record['id_product'];
         if (!empty($record['id_product_attribute'])) {
-            $history_url .= '&id_product_attribute=' . (int)$record['id_product_attribute'];
+            $_GET['id_product_attribute'] = $record['id_product_attribute'];
         }
-        $history_url .= '&token=' . $this->token;
 
-        Tools::redirectAdmin($history_url);
+        // Mostrar historial del producto directamente
+        return $this->renderProductHistory();
     }
 
     /**
-     * Renderizar historial completo del producto
+     * Init content - manejar vista de historial
      */
     public function initContent()
     {
+        // Si viene con viewproduct, mostrar historial
         if (Tools::getValue('viewproduct')) {
             $this->content = $this->renderProductHistory();
-            // NO return - dejar que parent renderice
+            $this->display = 'view'; // Importante: usar 'view' para que PrestaShop lo renderice
         }
 
         parent::initContent();
