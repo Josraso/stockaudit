@@ -41,6 +41,20 @@ class StockAvailable extends StockAvailableCore
             return;
         }
 
+        // IMPORTANTE: Si es el producto padre (id_product_attribute = 0) y tiene combinaciones,
+        // NO registrar el cambio porque el stock real está en las combinaciones
+        if ((int)$this->id_product_attribute == 0) {
+            // Verificar si el producto tiene combinaciones
+            $sql = 'SELECT COUNT(*) FROM ' . _DB_PREFIX_ . 'product_attribute
+                    WHERE id_product = ' . (int)$this->id_product;
+            $has_combinations = (int)Db::getInstance()->getValue($sql) > 0;
+
+            if ($has_combinations) {
+                // Es un producto padre con combinaciones - NO registrar
+                return;
+            }
+        }
+
         // Obtener instancia del módulo
         $module = Module::getInstanceByName('stockaudit');
         if (!$module) {
