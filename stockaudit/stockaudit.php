@@ -456,35 +456,16 @@ class StockAudit extends Module
     }
 
     /**
-     * Hook: Validación de pedido
+     * Hook: Validación de pedido - Solo para log inicial sin duplicar
+     * El override de StockAvailable captura el cambio real de stock
+     * Este hook solo añade el id_order al registro que ya existe
      */
     public function hookActionValidateOrder($params)
     {
-        if (isset($params['order'])) {
-            $order = $params['order'];
-
-            foreach ($order->getProducts() as $product) {
-                $id_product = (int)$product['product_id'];
-                $id_product_attribute = (int)$product['product_attribute_id'];
-
-                // Obtener stock actual ANTES de que se decremente
-                $quantity_before = $this->getProductStock($id_product, $id_product_attribute);
-
-                // El stock después será el stock actual menos la cantidad del pedido
-                $quantity_after = $quantity_before - (int)$product['product_quantity'];
-
-                // Registrar la reserva/venta
-                $this->logStockMovement(
-                    $id_product,
-                    $id_product_attribute,
-                    $quantity_before,
-                    $quantity_after,
-                    'order',
-                    'Pedido #' . (int)$order->id . ' (' . (int)$product['product_quantity'] . ' unidades)',
-                    (int)$order->id
-                );
-            }
-        }
+        // NO hacemos nada aquí para evitar duplicados
+        // El override de StockAvailable ya captura el cambio real con stock correcto
+        // Ver override/classes/StockAvailable.php
+        return;
     }
 
     /**

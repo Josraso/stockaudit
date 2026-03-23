@@ -77,9 +77,38 @@ class StockAvailable extends StockAvailableCore
             } elseif (strpos($controller_name, 'AdminStock') !== false) {
                 $movement_type = 'manual_update';
                 $reason = 'Actualización desde control de stocks';
-            } elseif (strpos($controller_name, 'Order') !== false) {
+            } elseif (strpos($controller_name, 'AdminImport') !== false) {
+                $movement_type = 'import';
+                $reason = 'Importación de datos';
+            } elseif (strpos($controller_name, 'Order') !== false || strpos($controller_name, 'order') !== false) {
+                // Pedido desde backoffice - intentar obtener ID de pedido
                 $movement_type = 'order';
-                $reason = 'Venta (pedido)';
+                $id_order_param = (int)Tools::getValue('id_order');
+                if ($id_order_param > 0) {
+                    $id_order = $id_order_param;
+                    $reason = 'Pedido #' . $id_order . ' (backoffice)';
+                } else {
+                    $reason = 'Venta desde backoffice';
+                }
+            }
+        }
+
+        // Si es FrontOffice y el stock BAJA, buscar si hay un pedido reciente asociado
+        if ($movement_type == 'update' && (int)$quantity_after < (int)$quantity_before) {
+            // Buscar el pedido más reciente que contenga este producto (último minuto)
+            $sql = 'SELECT o.id_order FROM `' . _DB_PREFIX_ . 'orders` o
+                    INNER JOIN `' . _DB_PREFIX_ . 'order_detail` od ON (od.id_order = o.id_order)
+                    WHERE od.product_id = ' . (int)$this->id_product . '
+                    AND od.product_attribute_id = ' . (int)$this->id_product_attribute . '
+                    AND o.date_add >= DATE_SUB(NOW(), INTERVAL 1 MINUTE)
+                    ORDER BY o.id_order DESC
+                    LIMIT 1';
+            $recent_order = Db::getInstance()->getValue($sql);
+
+            if ($recent_order) {
+                $id_order = (int)$recent_order;
+                $movement_type = 'order';
+                $reason = 'Pedido #' . $id_order;
             }
         }
 
